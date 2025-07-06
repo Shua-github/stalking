@@ -25,3 +25,6 @@ captures/
 
 # NDK build cache
 .ndk/
+
+# temp
+data.json

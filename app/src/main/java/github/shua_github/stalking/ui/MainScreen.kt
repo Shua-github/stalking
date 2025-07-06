@@ -27,6 +27,17 @@ fun MainScreen() {
     val fineLocationPermission = Manifest.permission.ACCESS_FINE_LOCATION
     val backgroundLocationPermission = Manifest.permission.ACCESS_BACKGROUND_LOCATION
 
+    val textColor = MaterialTheme.colorScheme.onPrimary
+    val outlineColor = MaterialTheme.colorScheme.outline
+    val customTextFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = textColor,
+        unfocusedTextColor = textColor,
+        focusedLabelColor = outlineColor,
+        unfocusedLabelColor = outlineColor.copy(alpha = 0.8f),
+        focusedPlaceholderColor = textColor.copy(alpha = 0.6f),
+        unfocusedPlaceholderColor = textColor.copy(alpha = 0.6f)
+    )
+
     Column(Modifier.padding(24.dp)) {
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Text("采集开关", Modifier.weight(1f))
@@ -37,24 +48,24 @@ fun MainScreen() {
             value = serverUrl,
             onValueChange = { serverUrl = it },
             label = { Text("服务器地址") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = customTextFieldColors
         )
         Spacer(Modifier.height(16.dp))
         OutlinedTextField(
             value = interval,
             onValueChange = { interval = it },
             label = { Text("上传间隔(秒)") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = customTextFieldColors
         )
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = {
-                // 检查前台定位权限
                 if (activity != null && activity.checkSelfPermission(fineLocationPermission) != PackageManager.PERMISSION_GRANTED) {
                     activity.requestPermissions(arrayOf(fineLocationPermission), 100)
                     return@Button
                 }
-                // 检查后台定位权限（Android 10+，你已设置最低API为12，直接检查）
                 if (activity != null && activity.checkSelfPermission(backgroundLocationPermission) != PackageManager.PERMISSION_GRANTED) {
                     activity.requestPermissions(arrayOf(backgroundLocationPermission), 101)
                     return@Button
@@ -62,8 +73,8 @@ fun MainScreen() {
                 saving = true
                 prefs.edit {
                     putBoolean("enabled", enabled)
-                        .putString("serverUrl", serverUrl.text)
-                        .putLong("interval", interval.text.toLongOrNull() ?: 60L)
+                    putString("serverUrl", serverUrl.text)
+                    putLong("interval", interval.text.toLongOrNull() ?: 60L)
                 }
                 val intent = Intent(context, MonitorService::class.java)
                 if (enabled) {

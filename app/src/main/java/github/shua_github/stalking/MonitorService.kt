@@ -37,6 +37,7 @@ class MonitorService : Service() {
     private val client = OkHttpClient()
     private var job: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO)
+    private var uploadCount = 0 // 新增：上报次数
 
     override fun onCreate() {
         super.onCreate()
@@ -72,10 +73,11 @@ class MonitorService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    // 修改：通知内容增加上报次数
     private fun buildNotification(): Notification {
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle("监控服务运行中")
-            .setContentText("正在收集设备信息...")
+            .setContentText("正在收集设备信息... 已上报 $uploadCount 次")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(true)
             .build()
@@ -158,7 +160,7 @@ class MonitorService : Service() {
 
 
     private fun getBootTime(): Long {
-        return System.currentTimeMillis() - SystemClock.elapsedRealtime() / 1000
+        return (System.currentTimeMillis() - SystemClock.elapsedRealtime()) / 1000
     }
 
     @SuppressLint("HardwareIds")
@@ -174,6 +176,9 @@ class MonitorService : Service() {
             Log.d("MonitorService", "Upload response code: ${response.code}")
             Log.d("MonitorService", "Response body: ${response.body?.string()}")
             response.close()
+            uploadCount++ // 新增：上报次数+1
+            // 新增：刷新通知
+            startForeground(notificationId, buildNotification())
         } catch (e: Exception) {
             Log.e("MonitorService", "Upload failed: ${e.message}", e)
         }
