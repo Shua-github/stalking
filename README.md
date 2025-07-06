@@ -3,15 +3,17 @@
 # 上报格式
 ```json
 {
-  "type": "device_info",
+  "type": "string",
   "data": {
-    "time": "number",
-    "lat": ["number", "null"],
-    "lng": ["number", "null"],
+    "time": "long",
+    "lat": "double|null",
+    "lng": "double|null",
     "isOnline": "boolean",
-    "bootTime": "number"
+    "bootTime": "long",
+    "deviceId": "string|null"
   }
 }
+
 ```
 
 目前只有`device_info`一个类型

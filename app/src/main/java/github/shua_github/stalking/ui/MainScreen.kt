@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import github.shua_github.stalking.MonitorService
+import androidx.core.content.edit
 
 @Composable
 fun MainScreen() {
@@ -23,7 +24,8 @@ fun MainScreen() {
     var interval by remember { mutableStateOf(TextFieldValue(prefs.getLong("interval", 60L).toString())) }
     var saving by remember { mutableStateOf(false) }
     val activity = context as? Activity
-    val permission = Manifest.permission.ACCESS_FINE_LOCATION
+    val fineLocationPermission = Manifest.permission.ACCESS_FINE_LOCATION
+    val backgroundLocationPermission = Manifest.permission.ACCESS_BACKGROUND_LOCATION
 
     Column(Modifier.padding(24.dp)) {
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -47,24 +49,25 @@ fun MainScreen() {
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = {
-                // 检查定位权限
-                if (activity != null && activity.checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
-                    activity.requestPermissions(arrayOf(permission), 100)
+                // 检查前台定位权限
+                if (activity != null && activity.checkSelfPermission(fineLocationPermission) != PackageManager.PERMISSION_GRANTED) {
+                    activity.requestPermissions(arrayOf(fineLocationPermission), 100)
+                    return@Button
+                }
+                // 检查后台定位权限（Android 10+，你已设置最低API为12，直接检查）
+                if (activity != null && activity.checkSelfPermission(backgroundLocationPermission) != PackageManager.PERMISSION_GRANTED) {
+                    activity.requestPermissions(arrayOf(backgroundLocationPermission), 101)
                     return@Button
                 }
                 saving = true
-                prefs.edit()
-                    .putBoolean("enabled", enabled)
-                    .putString("serverUrl", serverUrl.text)
-                    .putLong("interval", interval.text.toLongOrNull() ?: 60L)
-                    .apply()
+                prefs.edit {
+                    putBoolean("enabled", enabled)
+                        .putString("serverUrl", serverUrl.text)
+                        .putLong("interval", interval.text.toLongOrNull() ?: 60L)
+                }
                 val intent = Intent(context, MonitorService::class.java)
                 if (enabled) {
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                        context.startForegroundService(intent)
-                    } else {
-                        context.startService(intent)
-                    }
+                    context.startForegroundService(intent)
                 } else {
                     context.stopService(intent)
                 }

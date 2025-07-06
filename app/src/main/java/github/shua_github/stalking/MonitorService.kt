@@ -8,8 +8,9 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.location.Location
-import android.net.ConnectivityManager
+import android.provider.Settings
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.RequiresPermission
@@ -28,10 +29,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class MonitorService : Service() {
     private val channelId = "monitor_service_channel"
@@ -100,10 +97,11 @@ class MonitorService : Service() {
 
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_NETWORK_STATE, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private suspend fun collectInfo(): Map<String, Any?> {
-        val location = getLocation() ?: mapOf("lat" to null, "lng" to null)
-        val isOnline = isNetworkConnected()
-        val bootTime = System.currentTimeMillis() / 1000
+        val location = getLocation()
+        val isOnline = this.isScreenON()
+        val bootTime = this.getBootTime()
         val time = System.currentTimeMillis() / 1000
+        val deviceId = this.getUniqueDeviceId()
         return mapOf(
             "type" to "device_info",
             "data" to mapOf(
@@ -111,36 +109,61 @@ class MonitorService : Service() {
                 "lat" to location["lat"],
                 "lng" to location["lng"],
                 "isOnline" to isOnline,
-                "bootTime" to bootTime
+                "bootTime" to bootTime,
+                "deviceId" to deviceId
             )
         )
     }
 
+    @SuppressLint("ServiceCast")
+    private fun isScreenON(): Boolean {
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        return pm.isInteractive
+    }
+
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     @OptIn(ExperimentalCoroutinesApi::class)
-    private suspend fun getLocation(): Map<String, Any?>? {
+    private suspend fun getLocation(): Map<String, Any?> {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
         return try {
-            val task = fusedLocationClient.lastLocation
-            val loc = suspendCancellableCoroutine<Location?> { cont ->
-                task.addOnSuccessListener { cont.resume(it, null) }
-                task.addOnFailureListener { cont.resume(null, null) }
+            val location = suspendCancellableCoroutine<Location?> { cont ->
+                fusedLocationClient.lastLocation
+                    .addOnSuccessListener { cont.resume(it, null) }
+                    .addOnFailureListener { cont.resume(null, null) }
             }
-            if (loc != null) mapOf("lat" to loc.latitude, "lng" to loc.longitude) else mapOf("lat" to null, "lng" to null)
-        } catch (_: Exception) {
+
+            if (location != null) {
+                mapOf("lat" to location.latitude, "lng" to location.longitude)
+            } else {
+                // fallback: 主动请求一次最新定位
+                val freshLocation = suspendCancellableCoroutine<Location?> { cont ->
+                    fusedLocationClient.getCurrentLocation(
+                        com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
+                        null
+                    ).addOnSuccessListener { cont.resume(it, null) }
+                     .addOnFailureListener { cont.resume(null, null) }
+                }
+                if (freshLocation != null) {
+                    mapOf("lat" to freshLocation.latitude, "lng" to freshLocation.longitude)
+                } else {
+                    mapOf("lat" to null, "lng" to null)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
             mapOf("lat" to null, "lng" to null)
         }
     }
 
-    @RequiresPermission(Manifest.permission.ACCESS_NETWORK_STATE)
-    private fun isNetworkConnected(): Boolean {
-        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-        val net = cm.activeNetworkInfo
-        return net != null && net.isConnected
+
+    private fun getBootTime(): Long {
+        return System.currentTimeMillis() - SystemClock.elapsedRealtime() / 1000
     }
 
-    private fun getBootTime(): String {
-        val bootMillis = System.currentTimeMillis() - SystemClock.elapsedRealtime()
-        return SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(bootMillis))
+    @SuppressLint("HardwareIds")
+    fun getUniqueDeviceId(): String? {
+        return Settings.Secure.getString(this.contentResolver, Settings.Secure.ANDROID_ID)
     }
 
     private fun uploadToServer(serverUrl: String, info: Map<String, Any?>) {
