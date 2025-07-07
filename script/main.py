@@ -80,7 +80,10 @@ def get_html_response() -> HTMLResponse:
             let ws;
             const dataMap = {};
             window.onload = () => {
-                ws = new WebSocket("ws://" + location.host + "/ws");
+                ws = new WebSocket(
+                    (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"
+                );
+
                 ws.onmessage = (event) => {
                     const allDevices = JSON.parse(event.data);
                     for (const d of allDevices) {
@@ -106,9 +109,11 @@ def get_html_response() -> HTMLResponse:
                     container.innerHTML += `<div><strong>设备: ${id}</strong><br>
                         设备时间: ${formatTimestamp(d.time)} <br>
                         纬度: ${d.lat}, 经度: ${d.lng} <br>
-                        在线: ${d.isOnline} <br>
+                        在线: ${d.isOnline ? "✅ 在线" : "❌ 离线"} <br>
                         启动时间: ${formatTimestamp(d.bootTime)} <br>
-                        最后更新时间: ${d.lastUpdate} <br>
+                        上传次数: ${d.uploadCount ?? ""} <br>
+                        存活秒数: ${d.aliveSeconds ?? ""} <br>
+                        最后更新时间: ${d.lastUpdate ?? ""} <br>
                         </div><hr>`;
                 }
             }
@@ -131,7 +136,7 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     active_connections.append(ws)
 
-    # ✅ 初次连接立即推送数据
+    # 初次连接立即推送数据
     try:
         await ws.send_json(list(data_store.values()))
     except Exception:
@@ -146,6 +151,7 @@ async def websocket_endpoint(ws: WebSocket):
 @app.post("/update")
 async def update(request: Request):
     payload = await request.json()
+    print("收到数据：", payload)
     device_data = payload.get("data", {})
     device_id = device_data.get("deviceId")
     if not device_id:
@@ -165,4 +171,4 @@ async def update(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=80)

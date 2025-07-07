@@ -10,10 +10,15 @@
     "lng": "double|null",
     "isOnline": "boolean",
     "bootTime": "long",
-    "deviceId": "string|null"
+    "deviceId": "string|null",
+    "uploadCount": "long",
+    "aliveSeconds": "long"
   }
 }
 
 ```
 
 目前只有`device_info`一个类型
+
+##### 其他
+已经变成石山力,轻点喷😭

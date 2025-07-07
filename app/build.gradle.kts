@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "github.shua_github.stalking"
-        minSdk = 31
+        minSdk = 30
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -50,8 +50,8 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     // 定位和网络
-    implementation("com.google.android.gms:play-services-location:21.2.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(libs.play.services.location)
+    implementation(libs.okhttp)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
